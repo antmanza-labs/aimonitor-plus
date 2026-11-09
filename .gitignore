@@ -1,0 +1,41 @@
+# Build output
+bin/
+obj/
+.vs/
+*.user
+*.suo
+TestResults/
+
+# Published apps and installers (attach these to a GitHub Release instead)
+BuildApplication/
+SimpleMikrotikMonitorApp/
+publish/
+Output/
+innosetup.exe
+
+# Runtime data - may contain router logs, customer IPs/usernames
+logs/
+router_logs/
+*.log
+
+# Settings files can hold router passwords, API keys and bot tokens
+appsettings.json
+appsettings.*.json
+!appsettings.example.json
+*.migrated-plaintext
+
+# Local backup of the v1 code taken during the v2 rebuild
+_pre-v2-backup/
+
+# Legacy v1 leftovers kept locally (old prototype, one-off patches and fix scripts)
+MikrotikMonitor/
+MikrotikMonitor.sln
+TestApp/
+*.patch
+ApplyScheduleFix*.bat
+BuildWithoutViewMenu.bat
+BuildInstallerWithBranding.bat
+CleanupForRelease.bat
+RouterConfigAnalyzer_Feature.txt
+SimpleMikrotikMonitor/MonitorTimer_Tick.txt
+MikrotikMonitorSetup/
