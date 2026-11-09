@@ -25,6 +25,12 @@ SolidCompression=yes
 ArchitecturesInstallIn64BitMode=x64
 ; Use the logo for the installer
 SetupIconFile=logo.ico
+; Tell Windows to refresh cached icons after install, so an upgrade over v1 shows the new logo
+ChangesAssociations=yes
+
+[InstallDelete]
+; v1 shipped a second copy of the app in {app}\win-x64 (old icon, old code). Remove it on upgrade.
+Type: filesandordirs; Name: "{app}\win-x64"
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -35,7 +41,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 ; Settings live in %APPDATA%\AIMonitorPlus (encrypted). Never ship a settings file or logs next to the exe.
 Source: "publish\win-x64\*"; DestDir: "{app}"; Excludes: "appsettings.json,*.pdb,logs\*,router_logs\*"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "logo.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "logo.ico"; DestDir: "{app}"; Flags: ignoreversion overwritereadonly uninsremovereadonly
 Source: "LICENSE"; DestDir: "{app}"; DestName: "LICENSE.txt"; Flags: ignoreversion
 Source: "TERMS.md"; DestDir: "{app}"; DestName: "TERMS.txt"; Flags: ignoreversion
 
