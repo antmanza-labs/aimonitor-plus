@@ -1,5 +1,23 @@
 # Changelog
 
+## Version 2.0.1
+
+### Dashboard
+- New router cards. Colour shows state:
+  - orange: waiting for first check
+  - green: online
+  - amber: a High or Critical alert in the last few hours
+  - red: unreachable
+  - grey: monitoring switched off
+- Each card shows priority, relative check time, uptime, next check, and the latest alert title. Hover for details; right-click to clear an alert.
+- The main window now fits any size, including maximised: cards wrap to the window width and the log fills the rest.
+- Routers are checked right after Start Monitoring (highest priority first, 30 s apart) instead of after a full interval.
+
+### Fixes
+- Taskbar and shortcuts could keep showing the v1 logo after upgrading. Windows caches icons by file path, so the icon now ships as `aimonitor.ico`. The installer removes v1's read-only `logo.ico` and its leftover `win-x64` folder, then refreshes Windows icons.
+- Claude Code sign-in hint now says `claude auth login`.
+- About shows the full version number.
+
 ## Version 2.0.0
 
 ### AI engines

@@ -1,5 +1,5 @@
 #define MyAppName "AIMonitor+"
-#define MyAppVersion "2.0"
+#define MyAppVersion "2.0.1"
 #define MyAppPublisher "Antmanza Labs"
 #define MyAppURL "https://www.antmanza.co.za"
 #define MyAppExeName "SimpleMikrotikMonitor.exe"
@@ -41,33 +41,37 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 ; Settings live in %APPDATA%\AIMonitorPlus (encrypted). Never ship a settings file or logs next to the exe.
 Source: "publish\win-x64\*"; DestDir: "{app}"; Excludes: "appsettings.json,*.pdb,logs\*,router_logs\*"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "logo.ico"; DestDir: "{app}"; Flags: ignoreversion overwritereadonly uninsremovereadonly
 Source: "LICENSE"; DestDir: "{app}"; DestName: "LICENSE.txt"; Flags: ignoreversion
 Source: "TERMS.md"; DestDir: "{app}"; DestName: "TERMS.txt"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\logo.ico"
+; aimonitor.ico (from the publish folder) is a new path, so the v1 logo cached for logo.ico can't come back
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\aimonitor.ico"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
-Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\logo.ico"; Tasks: desktopicon
+Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\aimonitor.ico"; Tasks: desktopicon
 
 [Registry]
 Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\{#MyAppExeName}"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName}"; Flags: uninsdeletekey
 Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\{#MyAppExeName}"; ValueType: string; ValueName: "Path"; ValueData: "{app}"; Flags: uninsdeletekey
-Root: HKCR; Subkey: "Applications\{#MyAppExeName}\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\logo.ico"; Flags: uninsdeletekey
+Root: HKCR; Subkey: "Applications\{#MyAppExeName}\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\aimonitor.ico"; Flags: uninsdeletekey
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
-; We'll use the code section instead to set the read-only attribute
 
 [Code]
+// v1 left a read-only logo.ico in the program folder. Clear the flag and remove it so only aimonitor.ico remains.
 procedure CurStepChanged(CurStep: TSetupStep);
 var
+  OldLogo: String;
   ResultCode: Integer;
 begin
-  if CurStep = ssPostInstall then
+  if CurStep = ssInstall then
   begin
-    // Make sure the logo file is read-only
-    if FileExists(ExpandConstant('{app}\\logo.ico')) then
-      Exec(ExpandConstant('{cmd}'), '/c attrib +R "' + ExpandConstant('{app}\\logo.ico') + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    OldLogo := ExpandConstant('{app}\logo.ico');
+    if FileExists(OldLogo) then
+    begin
+      Exec(ExpandConstant('{sys}\attrib.exe'), '-R "' + OldLogo + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+      DeleteFile(OldLogo);
+    end;
   end;
 end;

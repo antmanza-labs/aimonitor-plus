@@ -192,7 +192,7 @@ namespace SimpleMikrotikMonitor.Controls
             _engineInfo.Text = Selected switch
             {
                 LLMProvider.ClaudeCode => "Runs the Claude Code CLI on this PC with your Claude subscription. No API key, no GPU load. " +
-                                          "Every check uses part of your plan's usage limits. Sign in once by running 'claude' in a terminal.",
+                                          "Every check uses part of your plan's usage limits. Sign in once: run 'claude auth login' in a terminal.",
                 LLMProvider.Anthropic => "Calls the Claude API directly. Billed per token from Anthropic Console credits (separate from a Claude subscription). " +
                                          "Haiku sorts each batch cheaply; the optional second look uses Sonnet only for High/Critical findings.",
                 LLMProvider.Ollama => "Runs a model on this PC through Ollama. Nothing leaves the PC, but it uses the GPU while analysing. " +

@@ -15,15 +15,14 @@ namespace SimpleMikrotikMonitor.Services
             _settings = settings;
 
             // Initialize next scheduled run times for all routers
+            // First check right away, staggered 30s apart so routers aren't all polled at the same moment.
             var now = DateTime.Now;
-            foreach (var router in _settings.MikrotikSettings.Routers)
+            int slot = 0;
+            foreach (var router in _settings.MikrotikSettings.Routers
+                         .Where(r => r.IsEnabled && r.Schedule.Enabled)
+                         .OrderByDescending(r => r.Schedule.Priority))
             {
-                if (router.IsEnabled && router.Schedule.Enabled)
-                {
-                    // Set initial next run time based on the current time plus the interval
-                    // This prevents all routers from being checked immediately on startup
-                    router.Schedule.NextScheduledRun = now.AddMinutes(router.Schedule.IntervalMinutes);
-                }
+                router.Schedule.NextScheduledRun = now.AddSeconds(-10 + 30 * slot++);
             }
         }
 

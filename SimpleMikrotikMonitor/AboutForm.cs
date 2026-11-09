@@ -45,7 +45,8 @@ namespace SimpleMikrotikMonitor
             ShowInTaskbar = false;
 
             // Try to load custom logo if it exists
-            string logoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logo.ico");
+            string logoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "aimonitor.ico");
+            if (!File.Exists(logoPath)) logoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logo.ico");
             if (File.Exists(logoPath))
             {
                 try
@@ -121,7 +122,7 @@ namespace SimpleMikrotikMonitor
 
             // Get the actual version from the assembly
             var version = Assembly.GetExecutingAssembly().GetName().Version;
-            var versionText = version != null ? $"Version {version.Major}.{version.Minor}" : "Version 2.0";
+            var versionText = version != null ? $"Version {version.Major}.{version.Minor}.{version.Build}" : "Version 2.0.1";
 
             var versionLabel = new Label
             {

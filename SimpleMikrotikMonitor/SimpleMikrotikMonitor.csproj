@@ -12,13 +12,14 @@
     <Description>AI log triage for MikroTik routers</Description>
     <Copyright>© 2025-2026 Antmanza Labs. MIT License.</Copyright>
     <PackageProjectUrl>https://www.antmanza.co.za</PackageProjectUrl>
-    <Version>2.0.0</Version>
+    <Version>2.0.1</Version>
     <ApplicationIcon>logo.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Shipped as aimonitor.ico: a new path, so Windows' icon cache doesn't show v1's logo.ico -->
     <Content Include="..\logo.ico">
-      <Link>logo.ico</Link>
+      <Link>aimonitor.ico</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

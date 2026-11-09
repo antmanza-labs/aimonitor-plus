@@ -95,8 +95,11 @@ namespace SimpleMikrotikMonitor
             MaximizeBox = true;
             MinimizeBox = true;
 
-            // Try to load custom logo if it exists
-            string logoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logo.ico");
+            MinimumSize = new Size(700, 500);
+
+            // aimonitor.ico is the v2 icon. A new file name than v1's logo.ico, so Windows' icon cache can't serve the old image.
+            string logoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "aimonitor.ico");
+            if (!File.Exists(logoPath)) logoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logo.ico");
             if (File.Exists(logoPath))
             {
                 try
@@ -180,6 +183,7 @@ namespace SimpleMikrotikMonitor
             {
                 Location = new Point(10, 290),
                 Size = new Size(960, 460),
+                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
                 ReadOnly = true,
                 Font = new Font("Consolas", 9F),
                 BackColor = SystemColors.Window,
@@ -191,6 +195,7 @@ namespace SimpleMikrotikMonitor
             {
                 Location = new Point(10, 80),
                 Size = new Size(960, 200),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
                 AutoScroll = true,
                 BorderStyle = BorderStyle.None,
                 FlowDirection = FlowDirection.LeftToRight,
@@ -210,6 +215,10 @@ namespace SimpleMikrotikMonitor
 
             // Add controls to form
             Controls.AddRange(new Control[] { _startButton, _settingsButton, _historyButton, _statusLabel, _dashboardPanel, _logTextBox });
+
+            // Fit cards and log to the window, including maximised / full screen
+            Resize += (_, _) => LayoutMain();
+            Shown += (_, _) => LayoutMain();
 
             // Initialize service managers
             _scheduleManager = new Services.ScheduleManager(_settings);
@@ -445,7 +454,7 @@ namespace SimpleMikrotikMonitor
                             _historyManager.AddHistoryEntry(router, false, message);
 
                             if (_routerWidgets.TryGetValue(router.Name, out var widget))
-                                widget.UpdateInfo(false, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), "Connection failed");
+                                widget.SetChecked(false, "", _lastConnectError ?? "Connection failed");
 
                             var down = _analyzer.OnConnectFailed(router, _lastConnectError ?? "Connection failed");
                             if (down != null) await NotifyAsync(router.Name, new List<Finding> { down }, force: true);
@@ -475,6 +484,12 @@ namespace SimpleMikrotikMonitor
                             AppendLog($"AI summary: {outcome.EngineSummary}", true);
                         foreach (var f in outcome.Findings.Where(f => f.Severity > Severity.Info))
                             AppendLog($"  [{f.Severity}] {f.Title}" + (string.IsNullOrWhiteSpace(f.SuggestedCheck) ? "" : $"  -> {f.SuggestedCheck}"), true);
+
+                        // Turn the dashboard card amber for the most serious new High/Critical finding
+                        var top = outcome.Findings.Where(f => f.Severity >= Severity.High && !f.IsRecovery)
+                                                  .OrderByDescending(f => f.Severity).FirstOrDefault();
+                        if (top != null && _routerWidgets.TryGetValue(router.Name, out var card))
+                            card.SetAlert(top.Severity, top.Title);
 
                         hasAlerts = await NotifyAsync(router.Name, outcome.Findings);
                         message = outcome.NewLines == 0
@@ -833,7 +848,10 @@ namespace SimpleMikrotikMonitor
                 return;
             }
 
-            var widget = new Controls.DashboardWidget(router);
+            var widget = new Controls.DashboardWidget(router)
+            {
+                AlertHold = TimeSpan.FromHours(Math.Max(1, _settings.AnalysisSettings.RepeatCooldownHours))
+            };
             _routerWidgets[router.Name] = widget;
             _dashboardPanel.Controls.Add(widget);
         }
@@ -849,6 +867,36 @@ namespace SimpleMikrotikMonitor
             {
                 AddRouterWidget(router);
             }
+            LayoutMain();
+        }
+
+        /// <summary>
+        /// Stretches the card area and log to the window. The card area grows to show every row of cards,
+        /// up to about half the window; beyond that it scrolls and the log keeps the rest.
+        /// </summary>
+        private void LayoutMain()
+        {
+            if (_dashboardPanel == null || _logTextBox == null || ClientSize.Height == 0) return;
+
+            int margin = _dashboardPanel.Left;
+            int width = Math.Max(200, ClientSize.Width - margin * 2);
+            _dashboardPanel.Width = width;
+
+            var card = _dashboardPanel.Controls.Count > 0 ? _dashboardPanel.Controls[0] : null;
+            int cardW = card != null ? card.Width + card.Margin.Horizontal : 282;
+            int cardH = card != null ? card.Height + card.Margin.Vertical : 182;
+            int perRow = Math.Max(1, (width - _dashboardPanel.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth) / cardW);
+            int rows = Math.Max(1, (int)Math.Ceiling(_dashboardPanel.Controls.Count / (double)perRow));
+
+            int wanted = rows * cardH + _dashboardPanel.Padding.Vertical;
+            int available = ClientSize.Height - _dashboardPanel.Top - 160;   // always leave room for the log
+            int maxHeight = Math.Max(cardH + _dashboardPanel.Padding.Vertical, Math.Min(available, (ClientSize.Height - _dashboardPanel.Top) / 2));
+            _dashboardPanel.Height = Math.Min(wanted, maxHeight);
+
+            _logTextBox.Top = _dashboardPanel.Bottom + 8;
+            _logTextBox.Left = margin;
+            _logTextBox.Width = width;
+            _logTextBox.Height = Math.Max(80, ClientSize.Height - _logTextBox.Top - margin);
         }
 
         private async Task UpdateRouterWidget(RouterConfig router, ITikConnection connection)
