@@ -92,6 +92,9 @@ namespace SimpleMikrotikMonitor.Analysis
         /// <summary>True when this finding came from app logic, not the AI (engine down, router unreachable).</summary>
         public bool FromRules { get; set; }
         public bool IsRecovery { get; set; }
+        /// <summary>What happened to the alert, set when notifications are decided (shown in History).</summary>
+        public string AlertStatus { get; set; } = string.Empty;
+        public bool AlertSent { get; set; }
     }
 
     public sealed class AnalysisOutcome

@@ -61,6 +61,14 @@ namespace SimpleMikrotikMonitor
                 // Initialize UI
                 InitializeUI();
 
+                // Older versions kept history inside settings.json; move it to the history files once.
+                var imported = _historyManager.Store.ImportLegacy(_settings);
+                if (imported > 0)
+                {
+                    SaveConfiguration();
+                    AppendLog($"Moved {imported} older history entries into the new history files.");
+                }
+
                 if (SettingsStore.MigrationNotice != null)
                     AppendLog(SettingsStore.MigrationNotice);
                 AppendLog($"AI engine: {Engines.EngineFactory.DisplayName(_settings.LLMSettings.Provider)}. Data folder: {AppPaths.DataDir}");
@@ -290,7 +298,7 @@ namespace SimpleMikrotikMonitor
 
         private void HistoryButton_Click(object sender, EventArgs e)
         {
-            using var historyForm = new HistoryForm(_settings);
+            using var historyForm = new HistoryForm(_settings, _historyManager.Store);
             historyForm.ShowDialog();
         }
 
@@ -431,8 +439,8 @@ namespace SimpleMikrotikMonitor
                     AppendLog($"Checking router: {router.Name} (Priority: {router.Schedule.Priority})");
                     bool success = false;
                     string message = "";
-                    int logCount = 0;
-                    bool hasAlerts = false;
+                    AnalysisOutcome? outcome = null;
+                    var extraFindings = new List<Finding>();   // unreachable / back-up findings for this check
 
                     try
                     {
@@ -449,28 +457,35 @@ namespace SimpleMikrotikMonitor
                         using var connection = await ConnectToRouter(router);
                         if (connection == null)
                         {
-                            message = $"Failed to connect to router: {router.Name}";
+                            message = $"Failed to connect: {_lastConnectError ?? "no answer"}";
                             AppendLog(message);
-                            _historyManager.AddHistoryEntry(router, false, message);
 
                             if (_routerWidgets.TryGetValue(router.Name, out var widget))
                                 widget.SetChecked(false, "", _lastConnectError ?? "Connection failed");
 
                             var down = _analyzer.OnConnectFailed(router, _lastConnectError ?? "Connection failed");
-                            if (down != null) await NotifyAsync(router.Name, new List<Finding> { down }, force: true);
+                            if (down != null)
+                            {
+                                await NotifyAsync(router.Name, new List<Finding> { down }, force: true);
+                                extraFindings.Add(down);
+                            }
+                            _historyManager.AddHistoryEntry(router, false, message, extraFindings);
                             continue;
                         }
 
                         var up = _analyzer.OnConnected(router);
-                        if (up != null) await NotifyAsync(router.Name, new List<Finding> { up }, force: true);
+                        if (up != null)
+                        {
+                            await NotifyAsync(router.Name, new List<Finding> { up }, force: true);
+                            extraFindings.Add(up);
+                        }
 
                         await UpdateRouterWidget(router, connection);
 
                         var logs = await GetRouterLogs(connection, router);
                         AppendLog($"Retrieved {logs.Count} log lines from {router.Name}.");
 
-                        var outcome = await _analyzer.AnalyzeAsync(router, logs);
-                        logCount = outcome.NewLines;
+                        outcome = await _analyzer.AnalyzeAsync(router, logs);
                         AppendLog(Describe(router, outcome));
                         if (outcome.UsageNote != null) AppendLog($"AI usage: {outcome.UsageNote}");
 
@@ -491,7 +506,7 @@ namespace SimpleMikrotikMonitor
                         if (top != null && _routerWidgets.TryGetValue(router.Name, out var card))
                             card.SetAlert(top.Severity, top.Title);
 
-                        hasAlerts = await NotifyAsync(router.Name, outcome.Findings);
+                        await NotifyAsync(router.Name, outcome.Findings);
                         message = outcome.NewLines == 0
                             ? "No new logs."
                             : $"{outcome.NewLines} new lines, {outcome.Findings.Count(f => f.Severity > Severity.Info)} findings.";
@@ -505,8 +520,18 @@ namespace SimpleMikrotikMonitor
                         success = false;
                     }
 
-                    // Add history entry
-                    _historyManager.AddHistoryEntry(router, success, message, logCount, hasAlerts);
+                    // History keeps every finding of this check, alerted or not
+                    try
+                    {
+                        if (outcome != null)
+                            _historyManager.AddCheck(router, success, message, outcome, Engines.EngineFactory.DisplayName(_settings.LLMSettings.Provider), extraFindings);
+                        else
+                            _historyManager.AddHistoryEntry(router, success, message, extraFindings);
+                    }
+                    catch (Exception histEx)
+                    {
+                        _logger.Error(histEx, "Could not write history for {Router}", router.Name);
+                    }
                 }
 
                 // Save configuration to persist history
@@ -728,9 +753,17 @@ namespace SimpleMikrotikMonitor
         private async Task<bool> NotifyAsync(string source, List<Finding> findings, bool force = false)
         {
             var a = _settings.AnalysisSettings;
-            var toSend = findings
-                .Where(f => force || f.IsRecovery || (f.Severity >= a.NotifyMinSeverity && _memory.ShouldNotify(f, a.RepeatCooldownHours)))
-                .ToList();
+            var toSend = new List<Finding>();
+
+            // Decide per finding, and record why, so History can show what happened to each one.
+            foreach (var f in findings)
+            {
+                if (force || f.IsRecovery) toSend.Add(f);
+                else if (f.Severity == Severity.Info) f.AlertStatus = "Routine, no alert";
+                else if (f.Severity < a.NotifyMinSeverity) f.AlertStatus = $"Not sent: below {a.NotifyMinSeverity}";
+                else if (!_memory.ShouldNotify(f, a.RepeatCooldownHours)) f.AlertStatus = $"Not sent: already reported (within {a.RepeatCooldownHours} h)";
+                else toSend.Add(f);
+            }
             if (toSend.Count == 0) return false;
 
             var telegram = new TelegramService(_settings.TelegramSettings);
@@ -740,13 +773,16 @@ namespace SimpleMikrotikMonitor
                 if (!ok)
                 {
                     AppendLog(error ?? "Telegram send failed.");
+                    foreach (var f in toSend) f.AlertStatus = "Telegram send failed, will retry";
                     return true; // not marked as notified, so it is retried next check
                 }
                 AppendLog($"Telegram: sent {toSend.Count} alert(s) for {source}.");
+                foreach (var f in toSend) { f.AlertStatus = "Sent to Telegram"; f.AlertSent = true; }
             }
             else
             {
                 AppendLog($"{toSend.Count} alert(s) for {source} (Telegram is off, shown here only).");
+                foreach (var f in toSend) f.AlertStatus = "Shown in app only (Telegram off)";
             }
 
             foreach (var f in toSend) _memory.MarkNotified(f);

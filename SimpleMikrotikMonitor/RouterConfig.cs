@@ -57,6 +57,7 @@ namespace SimpleMikrotikMonitor
         public bool IsEnabled { get; set; }
         public bool ShowWidget { get; set; } = true;
         public RouterSchedule Schedule { get; set; } = new RouterSchedule();
+        /// <summary>Legacy (v1/v2.0) history kept inside settings.json. Imported into the history files on startup, then left empty.</summary>
         public List<RouterHistoryEntry> History { get; set; } = new List<RouterHistoryEntry>();
 
         public RouterConfig()
@@ -70,16 +71,6 @@ namespace SimpleMikrotikMonitor
             IsEnabled = true;
             Schedule = new RouterSchedule();
             History = new List<RouterHistoryEntry>();
-
-            // Add an initial history entry
-            History.Add(new RouterHistoryEntry
-            {
-                Timestamp = DateTime.Now,
-                Success = true,
-                Message = "Router added to monitoring",
-                LogCount = 0,
-                HasAlerts = false
-            });
         }
     }
 
@@ -198,6 +189,8 @@ namespace SimpleMikrotikMonitor
         public int MaxEventsPerCall { get; set; } = 150;
         /// <summary>Alert when a router can't be reached for this many checks in a row (0 = off).</summary>
         public int UnreachableAfterFailures { get; set; } = 2;
+        /// <summary>Keep check history (with all findings) for this many days.</summary>
+        public int HistoryDays { get; set; } = 30;
     }
 
     public class GoogleSettings

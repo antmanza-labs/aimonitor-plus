@@ -1,5 +1,23 @@
 # Changelog
 
+## Version 2.1.0
+
+### History with findings
+- Every check is recorded with:
+  - log line counts: received, filtered, already known, sent to AI
+  - the engine used and token usage
+  - the AI summary and any engine error
+  - every finding, not only the ones that were alerted
+- Each finding keeps its severity, impact, likely cause, suggested check and how often it was seen. It also keeps its alert status: sent to Telegram, below the notify level, already reported within the cooldown, shown in app only, or send failed.
+- "Router unreachable" and "reachable again" are recorded with the check they happened on.
+- New History window:
+  - filter by router and period (24 h, 7 or 30 days)
+  - "only checks with findings" filter
+  - rows coloured by worst severity
+  - click a check to see its summary and every finding
+  - copy the details to the clipboard
+- History moved out of settings.json into daily files under `%APPDATA%\AIMonitorPlus\history\`, kept 30 days. Existing entries are imported automatically on first start.
+
 ## Version 2.0.1
 
 ### Dashboard

@@ -78,6 +78,7 @@ Everything is under `%APPDATA%\AIMonitorPlus\`:
 |---|---|
 | `settings.json` | Settings. Router passwords, API keys and the bot token are encrypted with Windows DPAPI (this Windows user only). |
 | `alert-memory.json` | What was seen, analysed and reported, plus daily token usage |
+| `history\history-yyyy-MM-dd.jsonl` | Every check with its AI summary and all findings, including the ones that were not alerted and why. Kept 30 days, viewed under **History**. |
 | `logs\`, `router_logs\` | App log and the last log pull per router. These can contain customer IPs and usernames. |
 
 Set the `AIMONITOR_DATA_DIR` environment variable to use another folder.
